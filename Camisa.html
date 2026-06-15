@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Camisa Gen 2027 | Diseña y Vota</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- PANTALLA DE AUTENTICACIÓN (PRIMERO) -->
+  <section id="pantallaAuth" class="auth-screen">
+    <div class="auth-container">
+      <div class="auth-brand">
+        <span class="badge">✨ GEN 2027 ✨</span>
+        <h1>Diseña la camiseta<br>de tu generación</h1>
+        <p>Participa, crea diseños únicos y vota por tu favorito. La comunidad decide la camiseta oficial.</p>
+        <div class="brand-colors">
+          <div class="color-dot" style="background: #3F5D44"></div>
+          <div class="color-dot" style="background: #6F8F7A"></div>
+          <div class="color-dot" style="background: #AFC4B6"></div>
+          <div class="color-dot" style="background: #E8E3D6"></div>
+          <div class="color-dot" style="background: #2B2E2C"></div>
+        </div>
+      </div>
+
+      <div class="auth-card-app">
+        <div class="auth-tabs">
+          <button id="tabLogin" class="tab-btn activo">Iniciar sesión</button>
+          <button id="tabRegistro" class="tab-btn">Crear cuenta</button>
+        </div>
+
+        <div id="formLogin" class="auth-form">
+          <h2>Bienvenido de nuevo</h2>
+          <p>Ingresa a tu cuenta para continuar</p>
+          <input type="email" id="loginEmail" placeholder="correo@ejemplo.com">
+          <input type="password" id="loginClave" placeholder="Contraseña">
+          <button id="btnLogin" class="btn-primary">Iniciar sesión →</button>
+        </div>
+
+        <div id="formRegistro" class="auth-form oculto">
+          <h2>Crea tu cuenta</h2>
+          <p>Regístrate y empieza a diseñar</p>
+          <input type="text" id="registroNombre" placeholder="Nombre completo">
+          <input type="email" id="registroEmail" placeholder="correo@ejemplo.com">
+          <input type="password" id="registroClave" placeholder="Contraseña (mínimo 4 caracteres)">
+          <button id="btnRegistro" class="btn-primary">Crear cuenta →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PANTALLA PRINCIPAL DE LA APP -->
+  <section id="pantallaApp" class="app-screen oculto">
+    <header class="hero">
+      <div class="hero-content">
+        <span class="badge">🎨 GEN 2027 🎨</span>
+        <h1>Propuestas para la camiseta</h1>
+        <p>Crea, guarda, edita y vota por la línea gráfica de la próxima camiseta</p>
+      </div>
+    </header>
+
+    <div class="estadisticas">
+      <div class="stat-card">
+        <h3 id="statDisenos">0</h3>
+        <p>Diseños</p>
+      </div>
+      <div class="stat-card">
+        <h3 id="statUsuarios">0</h3>
+        <p>Usuarios</p>
+      </div>
+      <div class="stat-card">
+        <h3 id="statVotos">0</h3>
+        <p>Votos</p>
+      </div>
+      <div class="stat-card">
+        <h3 id="statPromedio">0</h3>
+        <p>Promedio ⭐</p>
+      </div>
+    </div>
+
+    <main class="contenedor">
+      <!-- PERFIL DEL USUARIO -->
+      <section class="profile-card card">
+        <div class="profile-info">
+          <div class="avatar-contenedor">
+            <img id="avatarUsuario" src="" alt="Avatar">
+          </div>
+          <div>
+            <h2 id="perfilNombre">Usuario</h2>
+            <p id="perfilEmail">correo@ejemplo.com</p>
+            <input type="file" id="inputAvatar" accept="image/*" style="margin-top: 12px;">
+            <small style="display: block; color: #6b7280; margin-top: 5px;">Sube una foto de perfil</small>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button id="btnCambiarCuenta" class="btn-secondary">Cambiar cuenta</button>
+          <button id="btnLogout" class="btn-delete">Cerrar sesión</button>
+        </div>
+      </section>
+
+      <!-- DISEÑADOR DE CAMISETA -->
+      <section class="panel card">
+        <div class="section-title">
+          <h2>🎨 Diseña tu camiseta</h2>
+          <p>Haz clic en cualquier parte de la camiseta y elige un color</p>
+        </div>
+        <input type="hidden" id="camisetaId">
+        <input type="text" id="nombreDiseno" placeholder="Nombre de tu diseño" class="input-moderno">
+        <textarea id="descripcion" placeholder="Describe tu diseño..." rows="3"></textarea>
+        <div class="color-controls">
+          <input type="color" id="colorPicker" value="#E8E3D6">
+          <p id="parteActual">🔍 Selecciona una parte de la camiseta</p>
+        </div>
+        <div class="botones-accion">
+          <button id="btnGuardar" class="btn-primary">💾 Guardar diseño</button>
+          <button id="btnActualizar" class="btn-edit oculto">✏️ Actualizar diseño</button>
+          <button id="btnCancelar" class="btn-cancel oculto">❌ Cancelar edición</button>
+          <button id="btnLimpiar" class="btn-secondary">🔄 Reiniciar colores</button>
+        </div>
+      </section>
+
+      <!-- VISTA PREVIA DE CAMISETA -->
+      <section class="camiseta-preview card">
+        <svg id="camisetaSvg" viewBox="0 0 300 360">
+          <path id="mangaIzquierda" class="parte-camiseta" d="M95 80 L35 115 L65 175 L110 150 Z" fill="#E8E3D6" stroke="#2B2E2C" stroke-width="3" stroke-linejoin="round"/>
+          <path id="mangaDerecha" class="parte-camiseta" d="M205 80 L265 115 L235 175 L190 150 Z" fill="#E8E3D6" stroke="#2B2E2C" stroke-width="3" stroke-linejoin="round"/>
+          <path id="torso" class="parte-camiseta" d="M95 80 Q150 120 205 80 L220 310 L80 310 Z" fill="#E8E3D6" stroke="#2B2E2C" stroke-width="3" stroke-linejoin="round"/>
+          <path id="cuello" class="parte-camiseta" d="M120 78 Q150 115 180 78 Q150 95 120 78" fill="#E8E3D6" stroke="#2B2E2C" stroke-width="3" stroke-linejoin="round"/>
+          <text x="150" y="205" text-anchor="middle" font-size="22" fill="#2B2E2C" font-weight="bold" font-family="Inter, sans-serif">GEN 2027</text>
+        </svg>
+      </section>
+
+      <!-- LISTA DE DISEÑOS -->
+      <section class="lista-disenos card">
+        <div class="section-title">
+          <h2>📋 Diseños de la comunidad</h2>
+          <p>Vota por tus favoritos o edita tus propios diseños</p>
+        </div>
+        <div id="contenedorCamisetas"></div>
+      </section>
+    </main>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="script.js"></script>
+</body>
+</html>
