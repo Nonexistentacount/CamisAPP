@@ -5,7 +5,7 @@ const uri = 'mongodb://localhost:27017';
 async function conectarBD() {
 try {
 await mongoose.connect(uri);
-console.log('Conectado correctamente a MongoDB Atlas con Mongoose');
+console.log('Conectado correctamente a MongoDB Atlas con Mongoose actualizado');
 } catch (error) {
 console.log('Error conectando con Mongoose:', error.message);
 }
