@@ -1,353 +1,465 @@
-// ==========================
-// VARIABLES GLOBALES
-// ==========================
+// ─── ESTADO GLOBAL ────────────────────────────────────────────────────────────
+let usuarioActual = null;
+let disenos = [];
 let parteSeleccionada = null;
+let modoEdicion = false;
 
-// ==========================
-// ELEMENTOS DOM
-// ==========================
-const pantallaAuth = document.getElementById('pantallaAuth');
-const pantallaApp = document.getElementById('pantallaApp');
-const tabLogin = document.getElementById('tabLogin');
-const tabRegistro = document.getElementById('tabRegistro');
-const formLogin = document.getElementById('formLogin');
-const formRegistro = document.getElementById('formRegistro');
-const btnRegistro = document.getElementById('btnRegistro');
-const btnLogin = document.getElementById('btnLogin');
-const btnLogout = document.getElementById('btnLogout');
-const btnCambiarCuenta = document.getElementById('btnCambiarCuenta');
-const perfilNombre = document.getElementById('perfilNombre');
-const perfilEmail = document.getElementById('perfilEmail');
-const avatarUsuario = document.getElementById('avatarUsuario');
-const colorPicker = document.getElementById('colorPicker');
-const parteActual = document.getElementById('parteActual');
-const btnGuardar = document.getElementById('btnGuardar');
-const btnActualizar = document.getElementById('btnActualizar');
-const btnCancelar = document.getElementById('btnCancelar');
-const btnLimpiar = document.getElementById('btnLimpiar');
-const contenedorCamisetas = document.getElementById('contenedorCamisetas');
-const inputAvatar = document.getElementById('inputAvatar');
-const buscadorInput = document.getElementById('buscadorCamisetas');
+const coloresBase = {
+  torso: '#E8E3D6',
+  mangaIzquierda: '#E8E3D6',
+  mangaDerecha: '#E8E3D6',
+  cuello: '#E8E3D6'
+};
 
-// Todas las partes editables (con clase 'parte-camiseta')
+let coloresActuales = { ...coloresBase };
+
+// ─── PERSISTENCIA SESIÓN ──────────────────────────────────────────────────────
+function guardarSesion(usuario) {
+  localStorage.setItem('sesionUsuario', JSON.stringify(usuario));
+}
+function cargarSesion() {
+  const data = localStorage.getItem('sesionUsuario');
+  return data ? JSON.parse(data) : null;
+}
+function borrarSesion() {
+  localStorage.removeItem('sesionUsuario');
+}
+
+// ─── HELPERS UI ───────────────────────────────────────────────────────────────
+function mostrar(id)  { document.getElementById(id)?.classList.remove('oculto'); }
+function ocultar(id) { document.getElementById(id)?.classList.add('oculto'); }
+
+function toast(icono, titulo, texto = '') {
+  Swal.fire({
+    icon: icono,
+    title: titulo,
+    text: texto,
+    timer: 2200,
+    showConfirmButton: false,
+    toast: true,
+    position: 'top-end',
+    timerProgressBar: true
+  });
+}
+
+// ─── PANTALLAS ────────────────────────────────────────────────────────────────
+function mostrarApp(usuario) {
+  usuarioActual = usuario;
+  guardarSesion(usuario);
+
+  ocultar('pantallaAuth');
+  mostrar('pantallaApp');
+
+  document.getElementById('perfilNombre').textContent = usuario.nombre;
+  document.getElementById('perfilEmail').textContent   = usuario.email;
+
+  const avatar = document.getElementById('avatarUsuario');
+  const avatarGuardado = localStorage.getItem(`avatar_${usuario.id}`);
+  avatar.src = avatarGuardado || `https://ui-avatars.com/api/?name=${encodeURIComponent(usuario.nombre)}&background=3F5D44&color=fff&size=90&rounded=true`;
+
+  cargarDisenos();
+}
+
+function mostrarAuth() {
+  usuarioActual = null;
+  borrarSesion();
+  mostrar('pantallaAuth');
+  ocultar('pantallaApp');
+  document.getElementById('loginEmail').value   = '';
+  document.getElementById('loginClave').value   = '';
+  document.getElementById('registroNombre').value = '';
+  document.getElementById('registroEmail').value  = '';
+  document.getElementById('registroClave').value  = '';
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+document.getElementById('tabLogin').addEventListener('click', () => {
+  mostrar('formLogin');  ocultar('formRegistro');
+  document.getElementById('tabLogin').classList.add('activo');
+  document.getElementById('tabRegistro').classList.remove('activo');
+});
+document.getElementById('tabRegistro').addEventListener('click', () => {
+  ocultar('formLogin');  mostrar('formRegistro');
+  document.getElementById('tabRegistro').classList.add('activo');
+  document.getElementById('tabLogin').classList.remove('activo');
+});
+
+// ─── REGISTRO ─────────────────────────────────────────────────────────────────
+document.getElementById('btnRegistro').addEventListener('click', async () => {
+  const nombre = document.getElementById('registroNombre').value.trim();
+  const email  = document.getElementById('registroEmail').value.trim();
+  const clave  = document.getElementById('registroClave').value;
+
+  if (!nombre || !email || !clave) {
+    return toast('warning', 'Completa todos los campos');
+  }
+
+  const btn = document.getElementById('btnRegistro');
+  btn.disabled = true;
+  btn.textContent = 'Creando cuenta...';
+
+  try {
+    const res = await fetch('/api/registro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, email, clave })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast('error', data.error || 'Error al registrarse');
+    } else {
+      toast('success', '¡Cuenta creada!', 'Ahora inicia sesión');
+      // Cambiar a tab login y pre-llenar email
+      document.getElementById('tabLogin').click();
+      document.getElementById('loginEmail').value = email;
+    }
+  } catch {
+    toast('error', 'No se pudo conectar con el servidor');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Crear cuenta →';
+  }
+});
+
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const clave  = document.getElementById('loginClave').value;
+
+  if (!email || !clave) {
+    return toast('warning', 'Ingresa tu correo y contraseña');
+  }
+
+  const btn = document.getElementById('btnLogin');
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, clave })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast('error', data.error || 'Credenciales incorrectas');
+    } else {
+      mostrarApp(data.usuario);
+    }
+  } catch {
+    toast('error', 'No se pudo conectar con el servidor');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Iniciar sesión →';
+  }
+});
+
+// Enter en inputs de auth
+['loginEmail','loginClave'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+});
+['registroNombre','registroEmail','registroClave'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btnRegistro').click();
+  });
+});
+
+// ─── LOGOUT / CAMBIAR CUENTA ─────────────────────────────────────────────────
+document.getElementById('btnLogout').addEventListener('click', async () => {
+  const confirm = await Swal.fire({
+    title: '¿Cerrar sesión?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, salir',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#991b1b'
+  });
+  if (confirm.isConfirmed) mostrarAuth();
+});
+
+document.getElementById('btnCambiarCuenta').addEventListener('click', () => mostrarAuth());
+
+// ─── AVATAR ───────────────────────────────────────────────────────────────────
+document.getElementById('inputAvatar').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const dataUrl = ev.target.result;
+    document.getElementById('avatarUsuario').src = dataUrl;
+    if (usuarioActual) localStorage.setItem(`avatar_${usuarioActual.id}`, dataUrl);
+    toast('success', 'Foto actualizada');
+  };
+  reader.readAsDataURL(file);
+});
+
+// ─── CAMISETA SVG ─────────────────────────────────────────────────────────────
 const partes = document.querySelectorAll('.parte-camiseta');
 
-// Almacenar todas las camisetas para filtrar
-let todasLasCamisetas = [];
+partes.forEach(parte => {
+  parte.style.cursor = 'pointer';
+  parte.addEventListener('click', () => {
+    parteSeleccionada = parte.id;
+    const nombres = {
+      torso: 'Torso',
+      mangaIzquierda: 'Manga izquierda',
+      mangaDerecha: 'Manga derecha',
+      cuello: 'Cuello'
+    };
+    document.getElementById('parteActual').textContent = `✏️ Editando: ${nombres[parte.id] || parte.id}`;
+    document.getElementById('colorPicker').value = coloresActuales[parte.id] || '#E8E3D6';
+    // highlight
+    partes.forEach(p => p.style.opacity = '0.7');
+    parte.style.opacity = '1';
+    parte.style.filter = 'drop-shadow(0 0 6px rgba(37,99,235,0.5))';
+    setTimeout(() => {
+      partes.forEach(p => { p.style.opacity = ''; p.style.filter = ''; });
+    }, 800);
+  });
+});
 
-// ==========================
-// FUNCIONES DE ALERTA
-// ==========================
-function alertaExito(texto) {
-  Swal.fire({ icon: 'success', title: '¡Éxito!', text: texto, confirmButtonColor: '#3F5D44', timer: 2000, showConfirmButton: true });
-}
-function alertaError(texto) {
-  Swal.fire({ icon: 'error', title: 'Error', text: texto, confirmButtonColor: '#dc2626' });
-}
-function alertaInfo(texto) {
-  Swal.fire({ icon: 'info', title: 'Información', text: texto, confirmButtonColor: '#3F5D44' });
-}
-function alertaConfirmacion(texto, callback) {
-  Swal.fire({ 
-    title: '¿Estás seguro?', text: texto, icon: 'warning', showCancelButton: true,
-    confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626'
-  }).then((result) => { if (result.isConfirmed) callback(); });
-}
-
-// ==========================
-// UTILIDADES
-// ==========================
-function emailValido(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
-function obtenerToken() { return localStorage.getItem('tokenCamisa'); }
-function obtenerUsuario() { const u = localStorage.getItem('usuarioCamisa'); return u ? JSON.parse(u) : null; }
-function headersConToken() { return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${obtenerToken()}` }; }
-function escapeHTML(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
-
-// ==========================
-// AUTENTICACIÓN
-// ==========================
-function mostrarLogin() {
-  pantallaAuth.classList.remove('oculto');
-  pantallaApp.classList.add('oculto');
-}
-function mostrarApp() {
-  const usuario = obtenerUsuario();
-  if (!usuario || !obtenerToken()) { mostrarLogin(); return; }
-  perfilNombre.textContent = usuario.nombre;
-  perfilEmail.textContent = usuario.email;
-  cargarAvatar();
-  pantallaAuth.classList.add('oculto');
-  pantallaApp.classList.remove('oculto');
-  cargarCamisetas();
-  cargarEstadisticas();
-}
-function cerrarSesion() {
-  localStorage.removeItem('tokenCamisa');
-  localStorage.removeItem('usuarioCamisa');
-  limpiarFormularioCompleto();
-  mostrarLogin();
-}
-async function cargarAvatar() {
-  try {
-    const res = await fetch('/api/me', { headers: { 'Authorization': `Bearer ${obtenerToken()}` } });
-    if (res.ok) {
-      const datos = await res.json();
-      avatarUsuario.src = datos.avatar ? '/uploads/' + datos.avatar : `https://ui-avatars.com/api/?background=3F5D44&color=fff&bold=true&size=120&name=${encodeURIComponent(perfilNombre.textContent)}`;
-    } else {
-      avatarUsuario.src = `https://ui-avatars.com/api/?background=3F5D44&color=fff&bold=true&size=120&name=${encodeURIComponent(perfilNombre.textContent)}`;
-    }
-  } catch { avatarUsuario.src = `https://ui-avatars.com/api/?background=3F5D44&color=fff&bold=true&size=120&name=${encodeURIComponent(perfilNombre.textContent)}`; }
-}
-
-// ==========================
-// ESTADÍSTICAS
-// ==========================
-async function cargarEstadisticas() {
-  try {
-    const res = await fetch('/api/estadisticas');
-    const datos = await res.json();
-    document.getElementById('statDisenos').textContent = datos.totalDisenos || 0;
-    document.getElementById('statUsuarios').textContent = datos.totalUsuarios || 0;
-    document.getElementById('statVotos').textContent = datos.totalVotos || 0;
-    document.getElementById('statPromedio').textContent = datos.promedioGeneral || 0;
-  } catch (e) { console.error(e); }
-}
-
-// ==========================
-// CRUD DE CAMISETAS - FUNCIONES CLAVE CORREGIDAS
-// ==========================
-
-// Obtiene TODOS los colores actuales del SVG (sin depender de selección)
-function obtenerColoresCompletos() {
-  const getFill = (id, defaultValue) => {
-    const el = document.getElementById(id);
-    return el ? el.getAttribute('fill') || defaultValue : defaultValue;
-  };
-  return {
-    torsoColor: getFill('torso', '#E8E3D6'),
-    mangaIzquierdaColor: getFill('mangaIzquierda', '#E8E3D6'),
-    mangaDerechaColor: getFill('mangaDerecha', '#E8E3D6'),
-    cuelloColor: getFill('cuello', '#D7D0C3'),
-    bordeMangaIzquierdaColor: getFill('bordeMangaIzquierda', '#3F5D44'),
-    bordeMangaDerechaColor: getFill('bordeMangaDerecha', '#3F5D44'),
-    bolsilloColor: getFill('bolsillo', '#E8E3D6'),
-    textoDBColor: getFill('logoDB', '#2B2E2C'),
-    solapaIzquierdaColor: getFill('solapaIzquierda', '#E8E3D6'),
-    solapaDerechaColor: getFill('solapaDerecha', '#E8E3D6')
-  };
-}
-
-function obtenerDatosFormulario() {
-  const nombreDiseno = document.getElementById('nombreDiseno').value.trim();
-  if (!nombreDiseno) { alertaError('Debes escribir el nombre del diseño.'); return null; }
-  const colores = obtenerColoresCompletos();
-  return {
-    nombreDiseno,
-    descripcion: document.getElementById('descripcion').value.trim(),
-    ...colores
-  };
-}
-
-function limpiarFormularioCompleto() {
-  document.getElementById('camisetaId').value = '';
-  document.getElementById('nombreDiseno').value = '';
-  document.getElementById('descripcion').value = '';
-  // Colores por defecto
-  const def = { torso: '#E8E3D6', manga: '#E8E3D6', cuello: '#D7D0C3', borde: '#3F5D44', bolsillo: '#E8E3D6', textoDB: '#2B2E2C', solapa: '#E8E3D6' };
-  document.getElementById('torso').setAttribute('fill', def.torso);
-  document.getElementById('mangaIzquierda').setAttribute('fill', def.manga);
-  document.getElementById('mangaDerecha').setAttribute('fill', def.manga);
-  document.getElementById('cuello').setAttribute('fill', def.cuello);
-  document.getElementById('bordeMangaIzquierda').setAttribute('fill', def.borde);
-  document.getElementById('bordeMangaDerecha').setAttribute('fill', def.borde);
-  document.getElementById('bolsillo').setAttribute('fill', def.bolsillo);
-  document.getElementById('logoDB').setAttribute('fill', def.textoDB);
-  document.getElementById('solapaIzquierda').setAttribute('fill', def.solapa);
-  document.getElementById('solapaDerecha').setAttribute('fill', def.solapa);
-  // Reset selección
-  partes.forEach(p => p.classList.remove('parte-activa'));
-  parteSeleccionada = null;
-  colorPicker.value = def.torso;
-  parteActual.innerHTML = '🔍 Selecciona una parte de la camiseta';
-  btnGuardar.classList.remove('oculto');
-  btnActualizar.classList.add('oculto');
-  btnCancelar.classList.add('oculto');
-}
-
-async function cargarCamisetas() {
-  try {
-    const res = await fetch('/api/camisetas');
-    const camisetas = await res.json();
-    todasLasCamisetas = camisetas;
-    const usuario = obtenerUsuario();
-    if (camisetas.length === 0) {
-      contenedorCamisetas.innerHTML = `<div class="mensaje-vacio">🎨 Todavía no hay diseños. ¡Sé el primero en crear uno!</div>`;
-      return;
-    }
-    renderizarCamisetas(camisetas, usuario);
-    
-    // Asignar eventos después de crear las tarjetas
-    document.querySelectorAll('.voto-btn').forEach(btn => btn.addEventListener('click', () => votar(btn.dataset.id, parseInt(btn.dataset.valor))));
-    document.querySelectorAll('.editar-btn').forEach(btn => btn.addEventListener('click', () => {
-      const id = btn.dataset.id;
-      const camiseta = todasLasCamisetas.find(c => c._id === id);
-      if (camiseta) editarCamiseta(camiseta);
-    }));
-    document.querySelectorAll('.eliminar-btn').forEach(btn => btn.addEventListener('click', () => eliminarCamiseta(btn.dataset.id)));
-    
-  } catch (e) { console.error(e); alertaError('Error al cargar las camisetas.'); }
-}
-
-function renderizarCamisetas(camisetas, usuario) {
-  contenedorCamisetas.innerHTML = '';
-  if (camisetas.length === 0) {
-    contenedorCamisetas.innerHTML = `<div class="mensaje-vacio">🔎 No se encontraron diseños con ese criterio.</div>`;
+document.getElementById('colorPicker').addEventListener('input', e => {
+  if (!parteSeleccionada) {
+    toast('info', 'Selecciona una parte de la camiseta primero');
     return;
   }
-  camisetas.forEach(c => {
-    const calificacion = Number(c.calificacion || 0).toFixed(1);
-    const totalVotos = c.votos?.length || 0;
-    const esCreador = usuario && c.creador?._id === usuario.id;
-    
-    let estrellasHTML = '';
-    const promedioRedondeado = Math.round(calificacion);
-    for (let i = 1; i <= 5; i++) {
-      estrellasHTML += i <= promedioRedondeado ? '⭐' : '☆';
-    }
-    
-    const votosCount = {};
-    if (c.votos) {
-      c.votos.forEach(v => { votosCount[v.valor] = (votosCount[v.valor] || 0) + 1; });
-    }
-    const desglose = Object.entries(votosCount).map(([k, v]) => `${k}⭐: ${v}`).join(', ');
-    
-    const tarjeta = document.createElement('div');
-    tarjeta.classList.add('tarjeta-camiseta');
-    tarjeta.innerHTML = `
-      <div class="camiseta-info">
-        <h3>${escapeHTML(c.nombreDiseno)}</h3>
-        <p><strong>🎨 Autor:</strong> ${escapeHTML(c.autor)}</p>
-        <p><strong>⭐ Calificación:</strong> ${calificacion} ${estrellasHTML} <span style="font-size:0.85rem;">👥 ${totalVotos} voto${totalVotos !== 1 ? 's' : ''}</span></p>
-        ${desglose ? `<p><small>${desglose}</small></p>` : ''}
-        <p class="descripcion-card">📝 ${escapeHTML(c.descripcion || 'Sin descripción.')}</p>
-        <div class="mini-camisa">
-          <div class="color-box" style="background:${c.torsoColor || '#E8E3D6'}" title="Torso"></div>
-          <div class="color-box" style="background:${c.mangaIzquierdaColor || '#E8E3D6'}" title="Manga izq"></div>
-          <div class="color-box" style="background:${c.mangaDerechaColor || '#E8E3D6'}" title="Manga der"></div>
-          <div class="color-box" style="background:${c.cuelloColor || '#D7D0C3'}" title="Cuello"></div>
-          <div class="color-box" style="background:${c.bordeMangaIzquierdaColor || '#3F5D44'}" title="Borde izq"></div>
-          <div class="color-box" style="background:${c.bordeMangaDerechaColor || '#3F5D44'}" title="Borde der"></div>
-          <div class="color-box" style="background:${c.bolsilloColor || '#E8E3D6'}" title="Bolsillo"></div>
-          <div class="color-box" style="background:${c.textoDBColor || '#2B2E2C'}" title="Texto DB"></div>
-          <div class="color-box" style="background:${c.solapaIzquierdaColor || '#E8E3D6'}" title="Solapa izq"></div>
-          <div class="color-box" style="background:${c.solapaDerechaColor || '#E8E3D6'}" title="Solapa der"></div>
-        </div>
-      </div>
-      <div class="acciones-card">
-        <div class="estrellas-votacion">
-          ${[1,2,3,4,5].map(v => `<button class="voto-btn" data-id="${c._id}" data-valor="${v}">${v}⭐</button>`).join('')}
-        </div>
-        <div class="acciones-crud">
-          ${esCreador ? `
-            <button class="btn-edit editar-btn" data-id="${c._id}">✏️ Editar</button>
-            <button class="btn-delete eliminar-btn" data-id="${c._id}">🗑️ Eliminar</button>
-          ` : '<span class="info-text">🔒 Solo el creador puede editar</span>'}
-        </div>
-      </div>
-    `;
-    contenedorCamisetas.appendChild(tarjeta);
+  const color = e.target.value;
+  coloresActuales[parteSeleccionada] = color;
+  document.getElementById(parteSeleccionada).setAttribute('fill', color);
+});
+
+document.getElementById('btnLimpiar').addEventListener('click', () => {
+  coloresActuales = { ...coloresBase };
+  Object.keys(coloresBase).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute('fill', coloresBase[id]);
   });
-}
-
-function filtrarCamisetas() {
-  const texto = buscadorInput.value.trim().toLowerCase();
-  if (!texto) {
-    renderizarCamisetas(todasLasCamisetas, obtenerUsuario());
-  } else {
-    const filtradas = todasLasCamisetas.filter(c => 
-      (c.nombreDiseno && c.nombreDiseno.toLowerCase().includes(texto)) ||
-      (c.autor && c.autor.toLowerCase().includes(texto))
-    );
-    renderizarCamisetas(filtradas, obtenerUsuario());
-  }
-  // Reasignar eventos después de filtrar
-  document.querySelectorAll('.voto-btn').forEach(btn => btn.addEventListener('click', () => votar(btn.dataset.id, parseInt(btn.dataset.valor))));
-  document.querySelectorAll('.editar-btn').forEach(btn => btn.addEventListener('click', () => {
-    const id = btn.dataset.id;
-    const camiseta = todasLasCamisetas.find(c => c._id === id);
-    if (camiseta) editarCamiseta(camiseta);
-  }));
-  document.querySelectorAll('.eliminar-btn').forEach(btn => btn.addEventListener('click', () => eliminarCamiseta(btn.dataset.id)));
-}
-
-function editarCamiseta(camiseta) {
-  // Cargar datos del formulario
-  document.getElementById('camisetaId').value = camiseta._id;
-  document.getElementById('nombreDiseno').value = camiseta.nombreDiseno;
-  document.getElementById('descripcion').value = camiseta.descripcion || '';
-  
-  // Aplicar colores guardados al SVG (incluye cuello, bolsillo, DB, torso)
-  document.getElementById('torso').setAttribute('fill', camiseta.torsoColor || '#E8E3D6');
-  document.getElementById('mangaIzquierda').setAttribute('fill', camiseta.mangaIzquierdaColor || '#E8E3D6');
-  document.getElementById('mangaDerecha').setAttribute('fill', camiseta.mangaDerechaColor || '#E8E3D6');
-  document.getElementById('cuello').setAttribute('fill', camiseta.cuelloColor || '#D7D0C3');
-  document.getElementById('bordeMangaIzquierda').setAttribute('fill', camiseta.bordeMangaIzquierdaColor || '#3F5D44');
-  document.getElementById('bordeMangaDerecha').setAttribute('fill', camiseta.bordeMangaDerechaColor || '#3F5D44');
-  document.getElementById('bolsillo').setAttribute('fill', camiseta.bolsilloColor || '#E8E3D6');
-  document.getElementById('logoDB').setAttribute('fill', camiseta.textoDBColor || '#2B2E2C');
-  document.getElementById('solapaIzquierda').setAttribute('fill', camiseta.solapaIzquierdaColor || '#E8E3D6');
-  document.getElementById('solapaDerecha').setAttribute('fill', camiseta.solapaDerechaColor || '#E8E3D6');
-  
-  // Quitar selección activa
-  partes.forEach(p => p.classList.remove('parte-activa'));
   parteSeleccionada = null;
-  colorPicker.value = camiseta.torsoColor || '#E8E3D6';
-  parteActual.innerHTML = '✏️ Editando diseño. Selecciona cualquier parte y cambia su color.';
-  
-  // Cambiar botones
-  btnGuardar.classList.add('oculto');
-  btnActualizar.classList.remove('oculto');
-  btnCancelar.classList.remove('oculto');
-  
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  alertaInfo('Modo edición activado. Modifica los colores y presiona "Actualizar diseño".');
+  document.getElementById('parteActual').textContent = '🔍 Selecciona una parte de la camiseta';
+  toast('success', 'Colores reiniciados');
+});
+
+// ─── DISEÑOS (localStorage como BD local) ─────────────────────────────────────
+function cargarDisenos() {
+  const raw = localStorage.getItem('disenos_gen2027');
+  disenos = raw ? JSON.parse(raw) : [];
+  renderizarDisenos();
+  actualizarEstadisticas();
 }
 
-async function votar(id, valor) {
-  if (!obtenerToken()) { alertaError('Debes iniciar sesión para votar.'); return; }
-  try {
-    const res = await fetch(`/api/camisetas/${id}/votar`, { method: 'POST', headers: headersConToken(), body: JSON.stringify({ valor }) });
-    const datos = await res.json();
-    if (res.ok) {
-      alertaExito(datos.mensaje);
-      await cargarCamisetas();
-      await cargarEstadisticas();
-    } else {
-      alertaError(datos.mensaje);
-    }
-  } catch (e) { alertaError('Error al votar.'); }
+function guardarDisenos() {
+  localStorage.setItem('disenos_gen2027', JSON.stringify(disenos));
 }
 
-async function eliminarCamiseta(id) {
-  if (!obtenerToken()) { alertaError('Debes iniciar sesión para eliminar un diseño.'); return; }
-  alertaConfirmacion('No podrás recuperar este diseño.', async () => {
-    try {
-      const res = await fetch(`/api/camisetas/${id}`, { method: 'DELETE', headers: headersConToken() });
-      const datos = await res.json();
-      if (res.ok) {
-        alertaExito(datos.mensaje);
-        await cargarCamisetas();
-        await cargarEstadisticas();
-        if (document.getElementById('camisetaId').value === id) limpiarFormularioCompleto();
-      } else {
-        alertaError(datos.mensaje);
-      }
-    } catch (e) { alertaError('Error al eliminar.'); }
+document.getElementById('btnGuardar').addEventListener('click', () => {
+  const nombre = document.getElementById('nombreDiseno').value.trim();
+  const descripcion = document.getElementById('descripcion').value.trim();
+
+  if (!nombre) return toast('warning', 'Ponle un nombre a tu diseño');
+
+  const diseno = {
+    id: Date.now().toString(),
+    nombre,
+    descripcion,
+    colores: { ...coloresActuales },
+    autorId: usuarioActual.id,
+    autorNombre: usuarioActual.nombre,
+    votos: [],
+    fecha: new Date().toLocaleDateString('es-CR')
+  };
+
+  disenos.unshift(diseno);
+  guardarDisenos();
+  renderizarDisenos();
+  actualizarEstadisticas();
+
+  document.getElementById('nombreDiseno').value = '';
+  document.getElementById('descripcion').value  = '';
+  toast('success', '¡Diseño guardado!');
+});
+
+// ─── EDICIÓN ─────────────────────────────────────────────────────────────────
+function iniciarEdicion(id) {
+  const diseno = disenos.find(d => d.id === id);
+  if (!diseno) return;
+
+  modoEdicion = true;
+  document.getElementById('camisetaId').value     = id;
+  document.getElementById('nombreDiseno').value   = diseno.nombre;
+  document.getElementById('descripcion').value    = diseno.descripcion;
+  coloresActuales = { ...diseno.colores };
+
+  Object.keys(coloresActuales).forEach(parte => {
+    const el = document.getElementById(parte);
+    if (el) el.setAttribute('fill', coloresActuales[parte]);
   });
+
+  ocultar('btnGuardar');
+  mostrar('btnActualizar');
+  mostrar('btnCancelar');
+  document.querySelector('.panel').scrollIntoView({ behavior: 'smooth' });
 }
 
-// ==========================
-// EVENTOS DE INTERFAZ
-// ==========================
-tabLogin.addEventListener('click', () => { tabLogin.classList.add('activo'); tabRegistro.classList.remove('activo'); formLogin.classList.remove('oculto'); formRegistro.classList.add('oculto'); });
-tabRegistro.addEventListener('click', () => { tabRegistro.classList.add('activo'); tabLogin.classList.remove('activo'); formRegistro.classList.remove('oculto'); formLogin.classList.add('oculto'); });s
+document.getElementById('btnActualizar').addEventListener('click', () => {
+  const id   = document.getElementById('camisetaId').value;
+  const idx  = disenos.findIndex(d => d.id === id);
+  if (idx === -1) return;
+
+  disenos[idx].nombre      = document.getElementById('nombreDiseno').value.trim();
+  disenos[idx].descripcion = document.getElementById('descripcion').value.trim();
+  disenos[idx].colores     = { ...coloresActuales };
+
+  guardarDisenos();
+  renderizarDisenos();
+  actualizarEstadisticas();
+  cancelarEdicion();
+  toast('success', 'Diseño actualizado');
+});
+
+document.getElementById('btnCancelar').addEventListener('click', cancelarEdicion);
+
+function cancelarEdicion() {
+  modoEdicion = false;
+  document.getElementById('camisetaId').value   = '';
+  document.getElementById('nombreDiseno').value = '';
+  document.getElementById('descripcion').value  = '';
+  coloresActuales = { ...coloresBase };
+  Object.keys(coloresBase).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute('fill', coloresBase[id]);
+  });
+  mostrar('btnGuardar');
+  ocultar('btnActualizar');
+  ocultar('btnCancelar');
+}
+
+// ─── VOTAR ───────────────────────────────────────────────────────────────────
+function votar(id, estrella) {
+  const idx = disenos.findIndex(d => d.id === id);
+  if (idx === -1) return;
+
+  const diseno = disenos[idx];
+  const votoExistente = diseno.votos.find(v => v.userId === usuarioActual.id);
+
+  if (votoExistente) {
+    if (votoExistente.valor === estrella) {
+      // quitar voto
+      diseno.votos = diseno.votos.filter(v => v.userId !== usuarioActual.id);
+    } else {
+      votoExistente.valor = estrella;
+    }
+  } else {
+    diseno.votos.push({ userId: usuarioActual.id, valor: estrella });
+  }
+
+  guardarDisenos();
+  renderizarDisenos();
+  actualizarEstadisticas();
+}
+
+// ─── ELIMINAR ─────────────────────────────────────────────────────────────────
+async function eliminarDiseno(id) {
+  const confirm = await Swal.fire({
+    title: '¿Eliminar diseño?',
+    text: 'Esta acción no se puede deshacer',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, eliminar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#991b1b'
+  });
+  if (!confirm.isConfirmed) return;
+
+  disenos = disenos.filter(d => d.id !== id);
+  guardarDisenos();
+  renderizarDisenos();
+  actualizarEstadisticas();
+  toast('success', 'Diseño eliminado');
+}
+
+// ─── RENDERIZAR LISTA ─────────────────────────────────────────────────────────
+function renderizarDisenos() {
+  const contenedor = document.getElementById('contenedorCamisetas');
+
+  if (disenos.length === 0) {
+    contenedor.innerHTML = `
+      <div class="mensaje-vacio">
+        <p style="font-size:2rem">👕</p>
+        <p>Aún no hay diseños. ¡Sé el primero en crear uno!</p>
+      </div>`;
+    return;
+  }
+
+  contenedor.innerHTML = disenos.map(diseno => {
+    const esAutor  = diseno.autorId === usuarioActual?.id;
+    const promedio = diseno.votos.length
+      ? (diseno.votos.reduce((a, v) => a + v.valor, 0) / diseno.votos.length).toFixed(1)
+      : '—';
+    const miVoto = diseno.votos.find(v => v.userId === usuarioActual?.id)?.valor || 0;
+
+    const estrellasHtml = [1,2,3,4,5].map(n => `
+      <button class="estrella ${n <= miVoto ? 'activa' : ''}" onclick="votar('${diseno.id}', ${n})">★</button>
+    `).join('');
+
+    const coloresHtml = Object.values(diseno.colores).map(c => `
+      <div class="color-box" style="background:${c}" title="${c}"></div>
+    `).join('');
+
+    return `
+      <div class="tarjeta-camiseta">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem">
+          <div>
+            <h3>${diseno.nombre}</h3>
+            <small style="color:var(--muted)">por ${diseno.autorNombre} · ${diseno.fecha}</small>
+          </div>
+          <span style="font-weight:700;font-size:1.1rem;white-space:nowrap">⭐ ${promedio}</span>
+        </div>
+        ${diseno.descripcion ? `<p class="descripcion-card">${diseno.descripcion}</p>` : ''}
+        <div class="mini-camisa" style="margin:0.75rem 0">${coloresHtml}</div>
+        <div class="acciones-card">
+          <div class="estrellas-votacion">${estrellasHtml}</div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            ${esAutor ? `
+              <button class="btn-edit" onclick="iniciarEdicion('${diseno.id}')">✏️ Editar</button>
+              <button class="btn-delete" onclick="eliminarDiseno('${diseno.id}')">🗑️ Eliminar</button>
+            ` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── ESTADÍSTICAS ─────────────────────────────────────────────────────────────
+function actualizarEstadisticas() {
+  const totalDisenos = disenos.length;
+  const autores      = [...new Set(disenos.map(d => d.autorId))].length;
+  const totalVotos   = disenos.reduce((a, d) => a + d.votos.length, 0);
+  const promedio     = disenos.length
+    ? (disenos.reduce((a, d) => {
+        if (!d.votos.length) return a;
+        return a + d.votos.reduce((s, v) => s + v.valor, 0) / d.votos.length;
+      }, 0) / disenos.filter(d => d.votos.length).length || 0).toFixed(1)
+    : '0';
+
+  document.getElementById('statDisenos').textContent  = totalDisenos;
+  document.getElementById('statUsuarios').textContent = autores;
+  document.getElementById('statVotos').textContent    = totalVotos;
+  document.getElementById('statPromedio').textContent = isNaN(promedio) ? '0' : promedio;
+}
+
+// ─── BADGE ────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.badge').forEach(el => {
+  el.style.cssText += ';display:inline-block;background:linear-gradient(90deg,#3F5D44,#6F8F7A);color:#fff;padding:.35rem .9rem;border-radius:999px;font-size:.8rem;font-weight:700;letter-spacing:.04em;margin-bottom:.75rem';
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+const sesionGuardada = cargarSesion();
+if (sesionGuardada) {
+  mostrarApp(sesionGuardada);
+} else {
+  mostrar('pantallaAuth');
+}
