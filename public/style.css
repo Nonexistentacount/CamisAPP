@@ -389,3 +389,79 @@ textarea,
 	.btn-cancel { width: 100%; }
 }
 
+
+/* ─── ESTRELLAS ─────────────────────────────────────────────────────────────── */
+.estrella {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  color: #d1d5db;
+  cursor: pointer;
+  padding: 0 2px;
+  transition: color 0.15s, transform 0.1s;
+  line-height: 1;
+}
+.estrella:hover,
+.estrella.activa {
+  color: #f59e0b;
+  transform: scale(1.2);
+}
+
+/* ─── AUTH MEJORADO ─────────────────────────────────────────────────────────── */
+.auth-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.auth-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+.brand-colors {
+  display: flex;
+  gap: .6rem;
+  margin-top: 1.25rem;
+}
+.color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.auth-brand p {
+  color: #475569;
+  font-size: 1rem;
+  line-height: 1.6;
+  max-width: 340px;
+}
+@media (max-width: 700px) {
+  .auth-container {
+    grid-template-columns: 1fr;
+  }
+  .auth-brand {
+    text-align: center;
+  }
+  .auth-brand p { max-width: 100%; }
+  .brand-colors { justify-content: center; }
+}
+
+/* ─── TARJETA CAMISETA MEJORADA ─────────────────────────────────────────────── */
+.tarjeta-camiseta + .tarjeta-camiseta {
+  margin-top: .75rem;
+}
+
+/* ─── BOTÓN LOADING ─────────────────────────────────────────────────────────── */
+button:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+/* ─── PARTE CAMISETA HOVER ──────────────────────────────────────────────────── */
+.parte-camiseta {
+  transition: filter 0.2s;
+}
+.parte-camiseta:hover {
+  filter: brightness(0.92);
+}
